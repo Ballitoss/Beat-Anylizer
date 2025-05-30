@@ -9,8 +9,8 @@ import telebot.apihelper
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # ← DIT IS JOUW EXTERNE RENDER-URL
 DOWNLOAD_DIR = "downloads"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # ← Jouw exacte Render URL
 
 # === INIT ===
 bot = TeleBot(BOT_TOKEN)
@@ -96,7 +96,7 @@ def webhook():
 
 # === STARTUP ===
 if __name__ == "__main__":
-    # Herstel webhook om dubbele update errors te voorkomen
+    telebot.apihelper.delete_webhook(BOT_TOKEN)  # Zorg dat oude update-polling wordt verwijderd
     bot.remove_webhook()
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")  # <- ZET DE JUISTE WEBHOOK
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
