@@ -1,7 +1,8 @@
-flask
-pyTelegramBotAPI
+Flask
+telebot
 yt_dlp
-pydub
 librosa
-soundfile
+numpy
 gunicorn
+pydub
+soundfile
