@@ -1,0 +1,8 @@
+pyTelegramBotAPI
+yt_dlp
+pydub
+librosa
+soundfile
+numpy
+scikit-learn
+audioread
