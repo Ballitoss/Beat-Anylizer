@@ -6,21 +6,14 @@ from pydub import AudioSegment
 import librosa
 import numpy as np
 import traceback
-from flask import Flask, request
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com/"
 DOWNLOAD_DIR = "downloads"
 
 # === INIT ===
 bot = telebot.TeleBot(BOT_TOKEN)
-app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
-# === STEL WEBHOOK IN ===
-bot.remove_webhook()
-bot.set_webhook(url=WEBHOOK_URL)
 
 # === HULPFUNCTIES ===
 def download_audio(url, filename):
@@ -36,6 +29,7 @@ def download_audio(url, filename):
         'no_warnings': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        print(f"🔗 Downloaden van: {url}")
         info = ydl.extract_info(url, download=True)
         mp3_path = os.path.join(DOWNLOAD_DIR, filename + ".mp3")
         return mp3_path
@@ -50,14 +44,18 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM HANDLERS ===
+# === HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.reply_to(message, "🎶 Welkom bij *Beat Analyzer Bot*!\n\nStuur me een YouTube-link van een beat en ik geef je de BPM, key en MP3 terug. 🎧\n\n📌 Wil je onbeperkt gebruik? Check [PayPal](https://paypal.me/Balskiee)", parse_mode="Markdown")
+    bot.reply_to(message,
+        "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
+        "Stuur me een YouTube-link van een beat en ik geef je de BPM, key én stuur je het MP3-bestand terug. 🎧",
+        parse_mode="Markdown"
+    )
 
 @bot.message_handler(func=lambda msg: True)
 def handle_link(message):
-    url = message.text.strip()
+    url = message.text.strip().split('?')[0]  # verwijder tracking/params
     if not url.startswith("http"):
         bot.reply_to(message, "❌ Stuur een geldige YouTube-link aub.")
         return
@@ -85,18 +83,6 @@ def handle_link(message):
         traceback.print_exc()
         bot.reply_to(message, f"❌ Analyse fout: `{e}`", parse_mode="Markdown")
 
-# === FLASK ROUTE ===
-@app.route("/", methods=['POST'])
-def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return '', 200
-    else:
-        return 'Invalid content type', 403
-
-# === START APP ===
-if __name__ == "__main__":
-    print("🤖 Bot draait via webhook...")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+# === START BOT ===
+print("🤖 Bot draait...")
+bot.infinity_polling()
