@@ -6,14 +6,31 @@ from pydub import AudioSegment
 import librosa
 import numpy as np
 import traceback
+import flask
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
 DOWNLOAD_DIR = "downloads"
+WEBHOOK_HOST = 'https://<JOUW-RENDER-NAAM>.onrender.com'
+WEBHOOK_PATH = f"/{BOT_TOKEN}/"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # === INIT ===
 bot = telebot.TeleBot(BOT_TOKEN)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+app = flask.Flask(__name__)
+
+@app.route(WEBHOOK_PATH, methods=['POST'])
+def webhook():
+    json_string = flask.request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return '', 200
+
+@app.route('/')
+def index():
+    return "✅ BeatAnalyzer Bot draait met Webhook!"
 
 # === HULPFUNCTIES ===
 def download_audio(url, filename):
@@ -35,36 +52,19 @@ def download_audio(url, filename):
 
 def analyze_beat(path):
     y, sr = librosa.load(path)
-    tempo_array, _ = librosa.beat.beat_track(y=y, sr=sr)
-    tempo = float(tempo_array) if isinstance(tempo_array, (float, int)) else float(tempo_array[0])
+    tempo_data, _ = librosa.beat.beat_track(y=y, sr=sr)
+    tempo = float(tempo_data) if isinstance(tempo_data, (float, int)) else float(tempo_data[0])
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
     key_index = chroma.mean(axis=1).argmax()
     keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
     key = keys[key_index]
     return round(tempo), key
 
-# === COMMANDOS ===
+# === HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.reply_to(message, 
-        "🎶 Welkom bij *Beat Analyzer Bot*!\n\n"
-        "Stuur een YouTube-link van een beat en je ontvangt automatisch:\n"
-        "✅ BPM\n✅ Key\n✅ MP3-download van de audio\n\n"
-        "👉 Voor premiumfuncties zoals sample-detectie, gebruik `/subscribe`",
-        parse_mode="Markdown"
-    )
+    bot.reply_to(message, "🎶 Welkom bij *Beat Analyzer Bot*!\n\nStuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand. 🎧", parse_mode="Markdown")
 
-@bot.message_handler(commands=['subscribe'])
-def handle_subscribe(message):
-    bot.send_message(
-        message.chat.id,
-        "💳 Om toegang te krijgen tot premium functies:\n"
-        "👉 [Klik hier om te betalen via PayPal](https://www.paypal.me/Balskiee)\n\n"
-        "Na betaling: stuur `/verify` of neem contact op.",
-        parse_mode="Markdown"
-    )
-
-# === LINK HANDLER ===
 @bot.message_handler(func=lambda msg: True)
 def handle_link(message):
     url = message.text.strip()
@@ -77,6 +77,7 @@ def handle_link(message):
     try:
         uid = str(uuid.uuid4())
         mp3_path = download_audio(url, uid)
+
         tempo, key = analyze_beat(mp3_path)
 
         caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
@@ -94,6 +95,11 @@ def handle_link(message):
         traceback.print_exc()
         bot.reply_to(message, f"❌ Analyse fout: `{e}`", parse_mode="Markdown")
 
-# === START ===
-print("🤖 Bot draait...")
-bot.infinity_polling()
+# === WEBHOOK ACTIVEREN ===
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL)
+print(f"🚀 Webhook actief: {WEBHOOK_URL}")
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
