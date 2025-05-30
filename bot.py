@@ -1,18 +1,19 @@
-import telebot
 import os
 import uuid
 import yt_dlp
-from pydub import AudioSegment
 import librosa
 import numpy as np
-import traceback
+from flask import Flask, request
+from telebot import TeleBot, types
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
 DOWNLOAD_DIR = "downloads"
+WEBHOOK_URL = "https://beat-analyzer-1.onrender.com"  # Vervang dit met jouw werkelijke Render URL
 
 # === INIT ===
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # === HULPFUNCTIES ===
@@ -29,10 +30,8 @@ def download_audio(url, filename):
         'no_warnings': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        print(f"🔗 Downloaden van: {url}")
-        info = ydl.extract_info(url, download=True)
-        mp3_path = os.path.join(DOWNLOAD_DIR, filename + ".mp3")
-        return mp3_path
+        ydl.download([url])
+    return os.path.join(DOWNLOAD_DIR, filename + ".mp3")
 
 def analyze_beat(path):
     y, sr = librosa.load(path)
@@ -44,20 +43,22 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === HANDLERS ===
+# === TELEGRAM HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.reply_to(message,
+    text = (
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
-        "Stuur me een YouTube-link van een beat en ik geef je de BPM, key én stuur je het MP3-bestand terug. 🎧",
-        parse_mode="Markdown"
+        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
+        "💸 Wil je ons steunen of extra functies?\n"
+        "[Betaal via PayPal](https://paypal.me/Balskiee)"
     )
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda msg: True)
 def handle_link(message):
-    url = message.text.strip().split('?')[0]  # verwijder tracking/params
+    url = message.text.strip()
     if not url.startswith("http"):
-        bot.reply_to(message, "❌ Stuur een geldige YouTube-link aub.")
+        bot.reply_to(message, "❌ Ongeldige YouTube-link.")
         return
 
     bot.reply_to(message, "⏬ Downloaden en analyseren van je beat, even geduld...")
@@ -65,7 +66,6 @@ def handle_link(message):
     try:
         uid = str(uuid.uuid4())
         mp3_path = download_audio(url, uid)
-
         tempo, key = analyze_beat(mp3_path)
 
         caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
@@ -80,9 +80,23 @@ def handle_link(message):
             )
 
     except Exception as e:
-        traceback.print_exc()
-        bot.reply_to(message, f"❌ Analyse fout: `{e}`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
 
-# === START BOT ===
-print("🤖 Bot draait...")
-bot.infinity_polling()
+# === FLASK ROUTES ===
+@app.route('/', methods=['GET'])
+def index():
+    return "🤖 Beat Analyzer Bot draait!"
+
+@app.route(f"/{BOT_TOKEN}", methods=['POST'])
+def webhook():
+    update = types.Update.de_json(request.stream.read().decode("utf-8"))
+    bot.process_new_updates([update])
+    return '', 200
+
+# === STARTUP ===
+if __name__ == "__main__":
+    import telebot.apihelper
+    telebot.apihelper.delete_webhook(BOT_TOKEN)
+    bot.remove_webhook()
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
