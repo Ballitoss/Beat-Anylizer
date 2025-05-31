@@ -4,15 +4,16 @@ import yt_dlp
 import librosa
 import numpy as np
 from flask import Flask, request
-from telebot import TeleBot, types
+import telebot
+from telebot import types
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
-DOWNLOAD_DIR = "downloads"
 WEBHOOK_URL = f"https://beat-anylizer-1.onrender.com"
+DOWNLOAD_DIR = "downloads"
 
 # === INIT ===
-bot = TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -42,7 +43,7 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM HANDLERS ===
+# === HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     bot.send_message(
@@ -81,7 +82,7 @@ def handle_link(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
 
-# === FLASK ENDPOINTS ===
+# === FLASK ROUTES ===
 @app.route('/', methods=['GET'])
 def index():
     return "🤖 Bot draait!"
@@ -89,16 +90,15 @@ def index():
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     try:
-        json_string = request.get_data().decode('utf-8')
-        update = types.Update.de_json(json_string)
-        print(f"[DEBUG] Webhook update ontvangen: {update}")
+        update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
         bot.process_new_updates([update])
+        print("[DEBUG] Webhook verwerkt")
     except Exception as e:
-        print(f"[ERROR] Webhook fout: {e}")
+        print(f"[ERROR] Fout bij verwerken webhook: {e}")
     return '', 200
 
 # === STARTUP ===
-if __name__ == "__main__":
+if __name__ == '__main__':
     import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
