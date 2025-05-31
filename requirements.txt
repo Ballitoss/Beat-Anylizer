@@ -1,9 +1,7 @@
 Flask==3.0.3
-gunicorn==21.2.0
-pyTelegramBotAPI==4.15.4
 yt_dlp==2025.5.22
 librosa==0.10.1
 numpy==1.26.4
-scipy==1.13.1
-soundfile==0.12.1
+pyTelegramBotAPI==4.17.0
 pydub==0.25.1
+soundfile==0.13.1
