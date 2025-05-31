@@ -1,8 +1,8 @@
-Flask
-telebot
-yt_dlp
-librosa
-numpy
-pydub
-soundfile
-gunicorn
+Flask==3.0.3
+pyTelegramBotAPI==4.15.4
+yt_dlp==2025.5.22
+librosa==0.10.1
+numpy==1.26.4
+scipy==1.13.1
+soundfile==0.12.1
+pydub==0.25.1
