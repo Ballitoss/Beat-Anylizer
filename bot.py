@@ -8,51 +8,21 @@ from telebot import TeleBot, types
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"
 DOWNLOAD_DIR = "downloads"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <-- Jouw Render live URL
 
-# === INIT ===
 bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# === HULPFUNCTIES ===
-def download_audio(url, filename):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(DOWNLOAD_DIR, filename + '.%(ext)s'),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True,
-        'no_warnings': True,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-    return os.path.join(DOWNLOAD_DIR, filename + ".mp3")
-
-def analyze_beat(path):
-    y, sr = librosa.load(path)
-    tempo_data, _ = librosa.beat.beat_track(y=y, sr=sr)
-    tempo = float(tempo_data) if isinstance(tempo_data, (float, int)) else float(tempo_data[0])
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-    key_index = chroma.mean(axis=1).argmax()
-    keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-    key = keys[key_index]
-    return round(tempo), key
-
-# === TELEGRAM HANDLERS ===
+# === HANDLERS MOETEN HIERBOVEN STAAN! ===
 @bot.message_handler(commands=['start'])
-def handle_start(message):
-    text = (
-        "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
-        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
-        "💸 Wil je ons steunen of extra functies?\n"
-        "[Betaal via PayPal](https://paypal.me/Balskiee)"
-    )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+def start_handler(message):
+    bot.send_message(message.chat.id, "👋 Welkom bij Beat Analyzer Bot! Stuur een YouTube-link voor BPM & Key.")
+
+@bot.message_handler(commands=['premium'])
+def premium_handler(message):
+    bot.send_message(message.chat.id, "💎 Premium komt eraan! Steun via PayPal: https://paypal.me/Balskiee")
 
 @bot.message_handler(func=lambda msg: True)
 def handle_link(message):
@@ -61,41 +31,57 @@ def handle_link(message):
         bot.reply_to(message, "❌ Ongeldige YouTube-link.")
         return
 
-    bot.reply_to(message, "⏬ Downloaden en analyseren van je beat, even geduld...")
+    bot.reply_to(message, "⏬ Downloaden en analyseren van je beat...")
 
     try:
-        uid = str(uuid.uuid4())
-        mp3_path = download_audio(url, uid)
-        tempo, key = analyze_beat(mp3_path)
+        filename = str(uuid.uuid4())
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(DOWNLOAD_DIR, filename + '.%(ext)s'),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True,
+            'no_warnings': True,
+        }
 
-        caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        mp3_path = os.path.join(DOWNLOAD_DIR, filename + ".mp3")
+
+        y, sr = librosa.load(mp3_path)
+        tempo_data, _ = librosa.beat.beat_track(y=y, sr=sr)
+        tempo = float(tempo_data)
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+        key_index = chroma.mean(axis=1).argmax()
+        keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        key = keys[key_index]
+
+        caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{round(tempo)}`\n🎹 Key: `{key}`"
         with open(mp3_path, 'rb') as audio:
             bot.send_audio(
                 message.chat.id,
                 audio,
                 caption=caption,
                 performer="BeatAnalyzer",
-                title=f"Beat {tempo}BPM in {key}",
+                title=f"Beat {round(tempo)} BPM - {key}",
                 parse_mode="Markdown"
             )
 
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"❌ Fout: `{e}`", parse_mode="Markdown")
 
-# === FLASK ROUTES ===
+# === WEBHOOKS ===
 @app.route('/', methods=['GET'])
 def index():
-    return "🤖 Beat Analyzer Bot draait!"
+    return "Bot draait."
 
 @app.route(f"/{BOT_TOKEN}", methods=['POST'])
 def webhook():
-    try:
-        json_string = request.get_data().decode('utf-8')
-        update = types.Update.de_json(json_string)
-        print("[DEBUG] Webhook update ontvangen:", update)
-        bot.process_new_updates([update])
-    except Exception as e:
-        print(f"[ERROR] Webhook update fout: {e}")
+    update = types.Update.de_json(request.stream.read().decode("utf-8"))
+    bot.process_new_updates([update])
     return '', 200
 
 # === STARTUP ===
@@ -103,4 +89,4 @@ if __name__ == "__main__":
     import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
