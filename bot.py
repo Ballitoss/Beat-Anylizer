@@ -9,7 +9,7 @@ from telebot import TeleBot, types
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
 DOWNLOAD_DIR = "downloads"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <-- Vervang dit met jouw echte Render URL indien nodig
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <-- jouw Render URL
 
 # === INIT ===
 bot = TeleBot(BOT_TOKEN)
@@ -78,7 +78,6 @@ def handle_link(message):
                 title=f"Beat {tempo}BPM in {key}",
                 parse_mode="Markdown"
             )
-
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
 
@@ -93,7 +92,13 @@ def webhook():
         json_string = request.get_data().decode('utf-8')
         update = types.Update.de_json(json_string)
         print("[DEBUG] Webhook update ontvangen!")
+        print(f"[DEBUG] Update JSON: {update.to_dict()}")
         bot.process_new_updates([update])
+
+        # Test: stuur altijd debug bevestiging terug als mogelijk
+        if update.message:
+            bot.send_message(update.message.chat.id, "✅ Bericht ontvangen (debug).")
+
     except Exception as e:
         print(f"[ERROR] Webhook update fout: {e}")
     return '', 200
@@ -103,4 +108,5 @@ if __name__ == "__main__":
     import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    print("🤖 Bot draait via webhook...")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
