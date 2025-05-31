@@ -5,12 +5,11 @@ import librosa
 import numpy as np
 from flask import Flask, request
 from telebot import TeleBot, types
-import telebot.apihelper
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
 DOWNLOAD_DIR = "downloads"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <-- Je Render domeinnaam
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <== Vervang dit als je domein verandert
 
 # === INIT ===
 bot = TeleBot(BOT_TOKEN)
@@ -47,6 +46,7 @@ def analyze_beat(path):
 # === TELEGRAM HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
+    print(f"[DEBUG] /start ontvangen van gebruiker: {message.chat.id}")
     text = (
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
         "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
@@ -82,6 +82,7 @@ def handle_link(message):
 
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
+        print(f"[ERROR] Analyse fout: {e}")
 
 # === FLASK ROUTES ===
 @app.route('/', methods=['GET'])
@@ -101,8 +102,7 @@ def webhook():
 
 # === STARTUP ===
 if __name__ == "__main__":
-    print("[INFO] Webhook instellen...")
+    import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-    print("[INFO] Flask server starten...")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
