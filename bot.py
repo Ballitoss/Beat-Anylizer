@@ -8,7 +8,7 @@ from telebot import TeleBot, types
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
-WEBHOOK_URL = f"https://beat-anylizer-1.onrender.com/{BOT_TOKEN}"  # Juiste URL incl. token
+WEBHOOK_URL = f"https://beat-anylizer-1.onrender.com"  # <== Jouw render link zonder slash
 DOWNLOAD_DIR = "downloads"
 
 # === INIT ===
@@ -16,7 +16,7 @@ bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# === ANALYSE FUNCTIE ===
+# === HULPFUNCTIES ===
 def download_audio(url, filename):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -26,11 +26,12 @@ def download_audio(url, filename):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'quiet': True
+        'quiet': True,
+        'no_warnings': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    return os.path.join(DOWNLOAD_DIR, filename + '.mp3')
+    return os.path.join(DOWNLOAD_DIR, filename + ".mp3")
 
 def analyze_beat(path):
     y, sr = librosa.load(path)
@@ -42,54 +43,65 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM HANDLERS ===
+# === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.send_message(message.chat.id, "🎶 Stuur me een YouTube-link en ik geef je BPM + Key + MP3!")
+    text = (
+        "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
+        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
+        "💸 Steunen? [PayPal](https://paypal.me/Balskiee)"
+    )
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda msg: True)
-def handle_url(message):
+@bot.message_handler(func=lambda message: True)
+def handle_all(message):
+    print("[DEBUG] handle_all triggered")
+    print(f"[DEBUG] Incoming message: {message.text}")
     url = message.text.strip()
     if not url.startswith("http"):
-        bot.send_message(message.chat.id, "❌ Ongeldige YouTube-link.")
+        bot.reply_to(message, "❌ Ongeldige YouTube-link.")
         return
 
-    bot.send_message(message.chat.id, "⏬ Beat wordt gedownload en geanalyseerd...")
+    bot.reply_to(message, "⏬ Downloaden en analyseren van je beat, even geduld...")
 
     try:
         uid = str(uuid.uuid4())
         mp3_path = download_audio(url, uid)
         tempo, key = analyze_beat(mp3_path)
 
-        caption = f"✅ *Analyse klaar!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
+        caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
         with open(mp3_path, 'rb') as audio:
             bot.send_audio(
                 message.chat.id,
                 audio,
                 caption=caption,
                 performer="BeatAnalyzer",
-                title=f"BPM {tempo} | Key {key}",
+                title=f"Beat {tempo}BPM in {key}",
                 parse_mode="Markdown"
             )
 
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Fout bij analyse: `{e}`", parse_mode="Markdown")
+        print(f"[ERROR] {e}")
+        bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
 
-# === WEBHOOK HANDLING ===
+# === FLASK ROUTES ===
+@app.route('/', methods=['GET'])
+def index():
+    return "🤖 Beat Analyzer Bot draait!"
+
 @app.route(f"/{BOT_TOKEN}", methods=['POST'])
 def webhook():
-    update = types.Update.de_json(request.stream.read().decode("utf-8"))
+    print("[DEBUG] Webhook route hit!")
+    json_str = request.get_data().decode('UTF-8')
+    update = types.Update.de_json(json_str)
+    print(f"[DEBUG] Update content: {json_str}")
     bot.process_new_updates([update])
     return '', 200
 
-@app.route("/", methods=['GET'])
-def index():
-    return "🤖 Bot online en klaar voor gebruik!", 200
-
-# === LAUNCH ===
+# === STARTUP ===
 if __name__ == "__main__":
     import telebot.apihelper
     telebot.apihelper.delete_webhook(BOT_TOKEN)
     bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
