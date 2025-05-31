@@ -4,7 +4,8 @@ import yt_dlp
 import librosa
 import numpy as np
 from flask import Flask, request
-from telebot import TeleBot, types
+import telebot
+from telebot.types import Update
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
@@ -12,11 +13,11 @@ WEBHOOK_URL = f"https://beat-anylizer-1.onrender.com/{BOT_TOKEN}"
 DOWNLOAD_DIR = "downloads"
 
 # === INIT ===
-bot = TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# === FUNCTIES ===
+# === ANALYSE FUNCTIES ===
 def download_audio(url, filename):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -42,28 +43,24 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(float(tempo)), key
 
-# === HANDLERS ===
+# === TELEGRAM HANDLERS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.send_message(message.chat.id,
+    bot.send_message(
+        message.chat.id,
         "🎶 *Welkom bij Beat Analyzer Bot!*\n"
         "Stuur een YouTube-link en ik geef je BPM + key + mp3 terug.\n"
         "💸 [Steun via PayPal](https://paypal.me/Balskiee)",
         parse_mode="Markdown"
     )
 
-@bot.message_handler(func=lambda msg: True)
+@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
-    url = message.text.strip()
-    if not url.startswith("http"):
-        bot.reply_to(message, "❌ Ongeldige YouTube-link.")
-        return
-
-    bot.reply_to(message, "⏬ Downloaden en analyseren van je beat, momentje...")
+    bot.reply_to(message, "⏬ Downloaden en analyseren van je beat, even geduld...")
 
     try:
         uid = str(uuid.uuid4())
-        mp3_path = download_audio(url, uid)
+        mp3_path = download_audio(message.text.strip(), uid)
         tempo, key = analyze_beat(mp3_path)
 
         caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
@@ -77,27 +74,25 @@ def handle_link(message):
                 parse_mode="Markdown"
             )
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"❌ Analyse fout:\n`{e}`", parse_mode="Markdown")
 
-# === ROUTES ===
+# === FLASK ROUTES ===
 @app.route('/', methods=['GET'])
 def index():
-    return "🤖 Bot draait nog steeds."
+    return "🤖 Beat Analyzer draait."
 
 @app.route(f"/{BOT_TOKEN}", methods=['POST'])
-def webhook():
-    try:
-        json_data = request.stream.read().decode("utf-8")
-        update = types.Update.de_json(json_data)
-        print("[DEBUG] Webhook update ontvangen:", update)
-        bot.process_new_update(update)
-    except Exception as e:
-        print(f"[ERROR] Webhook fout: {e}")
+def receive_update():
+    json_str = request.get_data().decode("utf-8")
+    update = Update.de_json(json_str)
+    print("[DEBUG] Webhook update ontvangen:", update)
+    bot.process_new_updates([update])
     return '', 200
 
 # === STARTUP ===
-if __name__ == "__main__":
+if __name__ == '__main__':
     import telebot.apihelper
+    telebot.apihelper.delete_webhook(BOT_TOKEN)  # Reset eerst
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
-    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
