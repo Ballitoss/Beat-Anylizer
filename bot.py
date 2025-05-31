@@ -9,15 +9,15 @@ import telebot.apihelper
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
-WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # ← DIT IS JOUW EXTERNE RENDER-URL
 DOWNLOAD_DIR = "downloads"
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"  # <-- DIT IS JOUW LIVE Render URL
 
 # === INIT ===
 bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# === HULPFUNCTIES ===
+# === FUNCTIES ===
 def download_audio(url, filename):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -44,16 +44,16 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM HANDLERS ===
+# === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    text = (
+    bot.send_message(
+        message.chat.id,
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
         "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
-        "💸 Wil je ons steunen of extra functies?\n"
-        "[Betaal via PayPal](https://paypal.me/Balskiee)"
+        "💸 Wil je ons steunen?\n[Betaal via PayPal](https://paypal.me/Balskiee)",
+        parse_mode="Markdown"
     )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda msg: True)
 def handle_link(message):
@@ -86,7 +86,7 @@ def handle_link(message):
 # === FLASK ROUTES ===
 @app.route('/', methods=['GET'])
 def index():
-    return "🤖 Beat Analyzer Bot draait!"
+    return "🤖 Bot draait via webhook!"
 
 @app.route(f"/{BOT_TOKEN}", methods=['POST'])
 def webhook():
@@ -94,9 +94,8 @@ def webhook():
     bot.process_new_updates([update])
     return '', 200
 
-# === STARTUP ===
+# === WEBHOOK SETUP & START ===
 if __name__ == "__main__":
-    telebot.apihelper.delete_webhook(BOT_TOKEN)  # Zorg dat oude update-polling wordt verwijderd
     bot.remove_webhook()
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")  # <- ZET DE JUISTE WEBHOOK
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
