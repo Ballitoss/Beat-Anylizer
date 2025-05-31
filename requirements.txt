@@ -1,6 +1,7 @@
-Flask==3.0.3
-pyTelegramBotAPI==4.12.0
+Flask
+telebot
 yt_dlp
 librosa
 numpy
+soundfile
 gunicorn
