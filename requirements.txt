@@ -1,8 +1,7 @@
-Flask
-telebot
-yt_dlp
-librosa
-numpy
 gunicorn
+flask
+yt_dlp
 pydub
+librosa
 soundfile
+telebot
