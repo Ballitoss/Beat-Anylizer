@@ -1,7 +1,6 @@
 Flask==2.3.3
 pyTelegramBotAPI==4.15.4
-yt_dlp
+yt-dlp
 librosa
 numpy
 soundfile
-gunicorn
