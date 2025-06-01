@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: beat-analyzer-bot
+    name: beat-analyzer
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn bot:app"
+    autoDeploy: true
     envVars:
-      - key: BOT_TOKEN
-        value: 7992940169:AAEvp2fuM-cgqeSgefoBGL8TnN1umXnQpAY
-      - key: WEBHOOK_URL
-        value: https://beat-analyzer.onrender.com
+      - key: PORT
+        value: 5000
