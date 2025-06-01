@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: beat-analyzer-bot
+    name: beat-analyzer
     env: python
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn bot:app
     envVars:
       - key: PORT
         value: 10000
     plan: free
+    build:
+      packages:
+        - ffmpeg
