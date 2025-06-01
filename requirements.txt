@@ -3,3 +3,4 @@ pyTelegramBotAPI==4.15.4
 yt_dlp==2024.5.27
 librosa==0.10.1
 numpy
+gunicorn
