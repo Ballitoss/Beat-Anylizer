@@ -4,6 +4,7 @@ import yt_dlp
 import librosa
 import numpy as np
 import logging
+import subprocess
 from flask import Flask, request
 from telebot import TeleBot
 from telebot.types import Update
@@ -22,7 +23,14 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 
-# === HULPFUNCTIES ===
+# === FFMPEG CHECK ===
+try:
+    ffmpeg_path = subprocess.check_output(["which", "ffmpeg"]).decode().strip()
+    logger.info(f"[CHECK] ffmpeg gevonden op: {ffmpeg_path}")
+except Exception as e:
+    logger.warning(f"[CHECK] ffmpeg NIET gevonden: {e}")
+
+# === AUDIO DOWNLOAD FUNCTIE ===
 def download_audio(url, filename):
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -39,6 +47,7 @@ def download_audio(url, filename):
         ydl.download([url])
     return os.path.join(DOWNLOAD_DIR, filename + ".mp3")
 
+# === ANALYSE FUNCTIE ===
 def analyze_beat(path):
     y, sr = librosa.load(path)
     tempo_data, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -49,7 +58,7 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM COMMANDS ===
+# === COMMAND: /start ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
     text = (
@@ -60,10 +69,10 @@ def handle_start(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"), content_types=["text"])
+# === AFHANDELEN YOUTUBE-LINK ===
+@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
     url = message.text.strip()
-    logger.debug(f"[Link handler] Trigger geactiveerd voor URL: {url}")
     bot.reply_to(message, "⏬ Downloaden en analyseren van je beat...")
 
     try:
@@ -82,10 +91,10 @@ def handle_link(message):
                 parse_mode="Markdown"
             )
     except Exception as e:
-        logger.exception("[Analyse Fout]")
+        logger.exception("❌ Fout tijdens analyse")
         bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
 
-# === FLASK WEBHOOK ROUTE ===
+# === FLASK ROUTES ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
