@@ -2,12 +2,12 @@ services:
   - type: web
     name: beat-analyzer
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
     startCommand: gunicorn bot:app
     envVars:
-      - key: PORT
-        value: 10000
-    plan: free
-    build:
-      packages:
-        - ffmpeg
+      - key: BOT_TOKEN
+        value: 7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o
+      - key: WEBHOOK_URL
+        value: https://beat-anylizer-1.onrender.com
