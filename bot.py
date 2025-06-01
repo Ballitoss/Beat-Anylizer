@@ -52,10 +52,17 @@ def analyze_beat(path):
 # === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
+    logger.info("[START] /start command ontvangen")
     try:
-        bot.send_message(message.chat.id, "🎶 Welkom bij Beat Analyzer! Stuur een YouTube-link en ik geef je de BPM & key terug.")
+        text = (
+            "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
+            "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
+            "💸 Wil je ons steunen of extra functies?\n"
+            "[Betaal via PayPal](https://paypal.me/Balskiee)"
+        )
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
     except Exception as e:
-        logger.exception(f"[START ERROR] {e}")
+        logger.exception(f"[START] Fout bij send_message: {e}")
 
 @bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
@@ -79,8 +86,9 @@ def handle_link(message):
             )
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
+        logger.exception("[BEAT] Fout bij verwerken beat")
 
-# === FLASK WEBHOOK ROUTES ===
+# === FLASK WEBHOOK ROUTE ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
