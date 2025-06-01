@@ -9,8 +9,8 @@ from telebot import TeleBot, types
 from telebot.types import Update
 
 # === CONFIG ===
-BOT_TOKEN = "7992940169:AAEvp2fuM-cgqeSgefoBGL8TnN1umXnQpAY"  # Nieuwe token hier
-WEBHOOK_URL = "https://beat-analyzer.onrender.com"  # Vervang door jouw Render-URL
+BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
+WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"
 DOWNLOAD_DIR = "downloads"
 
 # === INIT ===
@@ -101,5 +101,7 @@ def index():
 
 # === STARTUP ===
 if __name__ == "__main__":
+    import telebot.apihelper
+    bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
