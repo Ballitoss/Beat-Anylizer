@@ -5,7 +5,8 @@ import librosa
 import numpy as np
 import logging
 from flask import Flask, request
-from telebot import TeleBot, types, util
+from telebot import TeleBot
+from telebot.types import Update
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
@@ -88,9 +89,8 @@ def webhook():
     try:
         json_str = request.get_data().decode("utf-8")
         logger.debug(f"[Webhook] JSON ontvangen: {json_str}")
-        updates = util.json2updates(json_str)
-        for update in updates:
-            bot.process_new_updates([update])
+        update = Update.de_json(json_str)
+        bot.process_new_updates([update])
         logger.info("[Webhook] Update verwerkt")
     except Exception as e:
         logger.exception(f"[Webhook] Fout bij verwerken update: {e}")
