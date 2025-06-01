@@ -53,14 +53,9 @@ def analyze_beat(path):
 @bot.message_handler(commands=["start"])
 def handle_start(message):
     text = (
-        "🎶 *Welkom bij Beat Analyzer Bot!*
-
-"
-        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.
-
-"
-        "💸 Wil je ons steunen of extra functies?
-"
+        "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
+        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
+        "💸 Wil je ons steunen of extra functies?\n"
         "[Betaal via PayPal](https://paypal.me/Balskiee)"
     )
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
@@ -75,9 +70,7 @@ def handle_link(message):
         mp3_path = download_audio(url, uid)
         tempo, key = analyze_beat(mp3_path)
 
-        caption = f"✅ *Analyse voltooid!*
-🎵 BPM: `{tempo}`
-🎹 Key: `{key}`"
+        caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
         with open(mp3_path, 'rb') as audio:
             bot.send_audio(
                 message.chat.id,
