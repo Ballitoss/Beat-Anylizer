@@ -1,6 +1,9 @@
 Flask
 pyTelegramBotAPI==4.14.0
-yt_dlp
+gunicorn
+yt-dlp
 librosa
 numpy
-gunicorn
+soundfile
+scipy
+pydub
