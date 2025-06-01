@@ -49,22 +49,25 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === HANDLERS ===
+# === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
-    logger.info(f"[Start] Start ontvangen van chat {message.chat.id}")
+    logger.info(f"[Start] /start ontvangen van chat {message.chat.id}")
     text = (
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
         "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
         "💸 Wil je ons steunen of extra functies?\n"
         "[Betaal via PayPal](https://paypal.me/Balskiee)"
     )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    try:
+        bot.send_message(message.chat.id, text, parse_mode="Markdown")
+        logger.info(f"[Start] Antwoord verzonden naar {message.chat.id}")
+    except Exception as e:
+        logger.exception(f"[Start] Fout bij antwoord: {e}")
 
 @bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
     url = message.text.strip()
-    logger.info(f"[Link] URL ontvangen: {url}")
     bot.reply_to(message, "⏬ Downloaden en analyseren van je beat...")
 
     try:
@@ -83,10 +86,9 @@ def handle_link(message):
                 parse_mode="Markdown"
             )
     except Exception as e:
-        logger.exception("[Analyse] Fout tijdens analyse")
         bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
 
-# === FLASK WEBHOOKS ===
+# === FLASK WEBHOOK ROUTE ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
@@ -103,10 +105,9 @@ def webhook():
 def index():
     return "🤖 Beat Analyzer Bot is live!"
 
-# === STARTEN ===
+# === STARTUP ===
 if __name__ == "__main__":
     import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-    logger.info(f"[Startup] Webhook ingesteld op {WEBHOOK_URL}/{BOT_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
