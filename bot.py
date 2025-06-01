@@ -9,7 +9,7 @@ from telebot import TeleBot, types
 from telebot.types import Update
 
 # === CONFIG ===
-BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
+BOT_TOKEN = "7992940169:AAEvp2fuM-cgqeSgefoBGL8TnN1umXnQpAY"  # <-- Je nieuwe token hier
 WEBHOOK_URL = "https://beat-anylizer-1.onrender.com"
 DOWNLOAD_DIR = "downloads"
 
@@ -52,7 +52,6 @@ def analyze_beat(path):
 # === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
-    logger.debug("[Command] /start ontvangen")
     text = (
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
         "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
