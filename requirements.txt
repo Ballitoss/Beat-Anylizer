@@ -1,9 +1,5 @@
-Flask==3.0.2
+Flask==2.2.5
 pyTelegramBotAPI==4.15.4
-yt_dlp==2024.4.9
+yt_dlp==2024.5.27
 librosa==0.10.1
-numpy==1.24.4
-scipy==1.11.4
-soundfile==0.12.1
-ffmpeg-python==0.2.0
-gunicorn==21.2.0
+numpy
