@@ -52,6 +52,7 @@ def analyze_beat(path):
 # === TELEGRAM COMMANDS ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
+    logger.debug("[Command] /start ontvangen")
     text = (
         "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
         "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
