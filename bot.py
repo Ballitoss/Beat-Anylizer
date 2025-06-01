@@ -6,7 +6,7 @@ import numpy as np
 import logging
 from flask import Flask, request
 from telebot import TeleBot, types
-from telebot.types import Update
+import telebot.types  # BELANGRIJK
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
@@ -49,7 +49,7 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM COMMANDS ===
+# === COMMAND HANDLERS ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
     logger.info(f"[Start] /start ontvangen van chat {message.chat.id}")
@@ -59,11 +59,7 @@ def handle_start(message):
         "💸 Wil je ons steunen of extra functies?\n"
         "[Betaal via PayPal](https://paypal.me/Balskiee)"
     )
-    try:
-        bot.send_message(message.chat.id, text, parse_mode="Markdown")
-        logger.info(f"[Start] Antwoord verzonden naar {message.chat.id}")
-    except Exception as e:
-        logger.exception(f"[Start] Fout bij antwoord: {e}")
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
@@ -86,19 +82,20 @@ def handle_link(message):
                 parse_mode="Markdown"
             )
     except Exception as e:
+        logger.exception("Fout bij beat-analyse")
         bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
 
-# === FLASK WEBHOOK ROUTE ===
+# === FLASK ROUTES ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
         json_str = request.get_data().decode("utf-8")
         logger.debug(f"[Webhook] JSON ontvangen: {json_str}")
-        update = Update.de_json(json_str)
+        update = telebot.types.Update.de_json(json_str)
         bot.process_new_updates([update])
         logger.info("[Webhook] Update verwerkt")
     except Exception as e:
-        logger.exception(f"[Webhook] Fout bij verwerken update: {e}")
+        logger.exception("[Webhook] Fout bij verwerken update")
     return "", 200
 
 @app.route("/", methods=["GET"])
@@ -107,7 +104,6 @@ def index():
 
 # === STARTUP ===
 if __name__ == "__main__":
-    import telebot.apihelper
     bot.remove_webhook()
     bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
