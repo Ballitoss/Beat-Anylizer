@@ -4,3 +4,5 @@ yt_dlp==2024.5.27
 librosa==0.10.1
 numpy
 gunicorn
+scipy
+ffmpeg-python
