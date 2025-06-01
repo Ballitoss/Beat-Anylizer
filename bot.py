@@ -91,6 +91,9 @@ def webhook():
         logger.debug(f"[Webhook] JSON ontvangen: {json_str}")
         update = Update.de_json(json_str)
         bot.process_new_updates([update])
+
+        # ✅ ECHT TESTBERICHT — gegarandeerd zichtbaar
+        bot.send_message(update.message.chat.id, "✅ Update ontvangen. Bot is actief.")
         logger.info("[Webhook] Update verwerkt")
     except Exception as e:
         logger.exception(f"[Webhook] Fout bij verwerken update: {e}")
