@@ -4,7 +4,6 @@ import yt_dlp
 import librosa
 import numpy as np
 import logging
-import soundfile as sf
 from flask import Flask, request
 from telebot import TeleBot
 from telebot.types import Update
@@ -61,10 +60,10 @@ def handle_start(message):
     )
     bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
-@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
+@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"), content_types=["text"])
 def handle_link(message):
     url = message.text.strip()
-    logger.info(f"[Link handler] YouTube-link ontvangen: {url}")
+    logger.debug(f"[Link handler] Trigger geactiveerd voor URL: {url}")
     bot.reply_to(message, "⏬ Downloaden en analyseren van je beat...")
 
     try:
@@ -83,10 +82,10 @@ def handle_link(message):
                 parse_mode="Markdown"
             )
     except Exception as e:
-        logger.exception("[Analyse] Fout tijdens download/analyse")
+        logger.exception("[Analyse Fout]")
         bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
 
-# === FLASK WEBHOOK ROUTES ===
+# === FLASK WEBHOOK ROUTE ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
