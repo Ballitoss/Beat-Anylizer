@@ -5,7 +5,8 @@ import librosa
 import numpy as np
 import logging
 from flask import Flask, request
-from telebot import TeleBot, types
+from telebot import TeleBot
+from telebot.types import Update
 
 # === CONFIG ===
 BOT_TOKEN = "7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o"
@@ -21,8 +22,9 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 
-# === HELPER FUNCTIES ===
+# === AUDIO DOWNLOAD ===
 def download_audio(url, filename):
+    logging.debug(f"⏬ Start download van: {url}")
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(DOWNLOAD_DIR, filename + '.%(ext)s'),
@@ -31,13 +33,15 @@ def download_audio(url, filename):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
+        'verbose': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
     return os.path.join(DOWNLOAD_DIR, filename + ".mp3")
 
+# === ANALYSE ===
 def analyze_beat(path):
     y, sr = librosa.load(path)
     tempo_data, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -48,43 +52,54 @@ def analyze_beat(path):
     key = keys[key_index]
     return round(tempo), key
 
-# === TELEGRAM COMMANDS ===
+# === COMMAND: /start ===
 @bot.message_handler(commands=["start"])
 def handle_start(message):
-    logger.info("START ontvangen")
-    bot.send_message(
-        message.chat.id,
-        "✅ Update ontvangen. Bot is actief.",
+    text = (
+        "🎶 *Welkom bij Beat Analyzer Bot!*\n\n"
+        "📎 Stuur me een YouTube-link van een beat en ik geef je de BPM en key terug, plus het MP3-bestand.\n\n"
+        "💸 Wil je ons steunen of extra functies?\n"
+        "[Betaal via PayPal](https://paypal.me/Balskiee)"
     )
+    bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
+# === HANDLE YOUTUBE LINK ===
 @bot.message_handler(func=lambda msg: msg.text and msg.text.startswith("http"))
 def handle_link(message):
-    logger.info("Link ontvangen: %s", message.text)
-    bot.send_message(message.chat.id, "🎧 Download wordt gestart...")
+    url = message.text.strip()
+    bot.send_message(message.chat.id, "⏬ Downloaden gestart...")
 
     try:
         uid = str(uuid.uuid4())
-        mp3_path = download_audio(message.text.strip(), uid)
-        tempo, key = analyze_beat(mp3_path)
+        bot.send_message(message.chat.id, f"📡 URL ontvangen:\n{url}")
+        
+        mp3_path = download_audio(url, uid)
+        bot.send_message(message.chat.id, f"✅ MP3 opgeslagen:\n{mp3_path}")
 
-        caption = f"✅ *Analyse voltooid!*\n🎵 BPM: `{tempo}`\n🎹 Key: `{key}`"
+        tempo, key = analyze_beat(mp3_path)
+        bot.send_message(message.chat.id, f"🎼 Analyse: {tempo} BPM, Key: {key}")
+
         with open(mp3_path, 'rb') as audio:
             bot.send_audio(
                 message.chat.id,
                 audio,
-                caption=caption,
+                caption=f"🎵 *Beat Analyse*\nBPM: `{tempo}`\nKey: `{key}`",
+                performer="BeatAnalyzer",
+                title=f"Beat {tempo}BPM in {key}",
                 parse_mode="Markdown"
             )
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Fout tijdens analyse:\n`{e}`", parse_mode="Markdown")
 
-# === WEBHOOK ROUTES ===
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Fout:\n`{e}`", parse_mode="Markdown")
+        logger.exception("Fout tijdens downloaden/analyseren")
+
+# === FLASK ROUTES ===
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     try:
         json_str = request.get_data().decode("utf-8")
         logger.debug(f"[Webhook] JSON ontvangen: {json_str}")
-        update = types.Update.de_json(json_str)
+        update = Update.de_json(json_str)
         bot.process_new_updates([update])
         logger.info("[Webhook] Update verwerkt")
     except Exception as e:
@@ -93,7 +108,7 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def index():
-    return "🤖 Beat Analyzer Bot draait!"
+    return "🤖 Beat Analyzer Bot is live!"
 
 # === STARTUP ===
 if __name__ == "__main__":
