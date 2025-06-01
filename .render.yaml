@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: beat-analyzer
+    name: beat-analyzer-bot
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn bot:app"
-    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn bot:app
     envVars:
       - key: PORT
-        value: 5000
+        value: 10000
