@@ -1,3 +1,6 @@
 #!/bin/bash
-apt-get update
-apt-get install -y ffmpeg
+apt update && apt install -y ffmpeg
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
