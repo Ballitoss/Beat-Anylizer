@@ -1,11 +1,15 @@
 [build]
-nixpacksPlan = "default"
-
-[build.default]
-builder = "NIXPACKS"
-buildCommand = """
-  apt update && apt install -y ffmpeg
-  pip install --upgrade pip
-  pip install -r requirements.txt
-"""
-startCommand = "gunicorn bot:app"
+nixpacksPlan = { 
+  pkgs = ["ffmpeg"], 
+  phases = {
+    setup = {
+      cmds = ["python -m venv venv"]
+    },
+    install = {
+      cmds = [". venv/bin/activate", "pip install -r requirements.txt"]
+    },
+    start = {
+      cmds = [". venv/bin/activate", "gunicorn bot:app"]
+    }
+  }
+}
