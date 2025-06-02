@@ -1,15 +1,5 @@
 [build]
-nixpacksPlan = { 
-  pkgs = ["ffmpeg"], 
-  phases = {
-    setup = {
-      cmds = ["python -m venv venv"]
-    },
-    install = {
-      cmds = [". venv/bin/activate", "pip install -r requirements.txt"]
-    },
-    start = {
-      cmds = [". venv/bin/activate", "gunicorn bot:app"]
-    }
-  }
-}
+cmd = "./build.sh"
+
+[start]
+cmd = "gunicorn bot:app"
