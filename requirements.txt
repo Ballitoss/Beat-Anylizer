@@ -6,3 +6,4 @@ numpy
 soundfile
 scipy
 pyTelegramBotAPI==4.14.1
+pydub==0.25.1
