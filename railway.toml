@@ -1,8 +1,8 @@
 [build]
 nixpacksPlan = { 
   phases = {
-    setup = { nixPkgs = ["ffmpeg", "python312", "python312Packages.pip"] },
-    install = "pip install -r requirements.txt",
-    start = "gunicorn bot:app"
+    setup = { nixPkgs = ["ffmpeg"] },
+    install = { cmds = ["pip install -r requirements.txt"] },
+    start = { cmd = "gunicorn bot:app" }
   }
 }
