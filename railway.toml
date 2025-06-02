@@ -1,2 +1,10 @@
 [build]
-command = "./build.sh"
+builder = "NIXPACKS"
+buildCommand = """
+apt update && apt install -y ffmpeg
+pip install --upgrade pip
+pip install -r requirements.txt
+"""
+
+[deploy]
+startCommand = "gunicorn bot:app"
