@@ -1,8 +1,17 @@
 [build]
-nixpacksPlan = { 
-  phases = {
-    setup = { nixPkgs = ["ffmpeg"] },
-    install = { cmds = ["pip install -r requirements.txt"] },
-    start = { cmd = "gunicorn bot:app" }
-  }
-}
+nixpacksVersion = "1.38.0"
+
+[build.nixpacksPlan]
+providers = ["python"]
+
+[build.nixpacksPlan.packages]
+apt = ["ffmpeg"]
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["python312", "ffmpeg"]
+
+[build.nixpacksPlan.phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
+
+[start]
+cmd = "gunicorn bot:app"
