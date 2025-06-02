@@ -1,71 +1,82 @@
-import telebot
 import os
 import logging
-from flask import Flask, request
-from youtube_download import download_youtube_audio
+import tempfile
+import telebot
 import librosa
+import numpy as np
+import soundfile as sf
+from flask import Flask, request
+from yt_dlp import YoutubeDL
 
-API_TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
-WEBHOOK_URL = 'https://web-production-cfc73.up.railway.app/' + API_TOKEN
-
-bot = telebot.TeleBot(API_TOKEN)
-app = Flask(__name__)
+# Logging activeren
 logging.basicConfig(level=logging.DEBUG)
 
-def analyze_audio(file_path):
-    try:
-        y, sr = librosa.load(file_path)
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
-        avg_chroma = chroma.mean(axis=1)
-        note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-        key_index = avg_chroma.argmax()
-        key = note_names[key_index]
-        return tempo, key
-    except Exception as e:
-        logging.error(f"Fout bij analyse: {e}")
-        return None, None
+# Telegram token en Flask
+TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
+bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
 
+# YouTube audio downloaden met cookies
+def download_audio_from_youtube(url):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(tempfile.gettempdir(), 'audio.%(ext)s'),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
+        'cookiefile': 'cookies.txt',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        return os.path.join(tempfile.gettempdir(), 'audio.wav')
+
+# BPM en toonhoogte analyseren
+def analyse_audio(file_path):
+    y, sr = librosa.load(file_path)
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    chroma = librosa.feature.chroma_cens(y=y, sr=sr)
+    chroma_mean = chroma.mean(axis=1)
+    key_index = chroma_mean.argmax()
+    key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][key_index]
+    return tempo, key
+
+# Telegram start command
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.reply_to(message, "🎧 Stuur me een YouTube-link van een beat, dan analyseer ik de BPM en Key.")
+    bot.send_message(message.chat.id, "🎶 Stuur me een YouTube-link en ik analyseer het voor je!")
 
-@bot.message_handler(func=lambda msg: msg.text and 'youtu' in msg.text)
+# YouTube-link ontvangen
+@bot.message_handler(func=lambda message: 'youtu' in message.text)
 def handle_youtube_link(message):
-    url = message.text.strip()
-    user_id = message.chat.id
-    logging.debug(f"Ontvangen YouTube-link: {url}")
-
-    file_path = download_youtube_audio(url, output_path="audio.mp3")
-    if file_path is None:
-        bot.send_message(user_id, "❌ Fout bij het downloaden van de audio.")
-        return
-
-    tempo, key = analyze_audio(file_path)
-    if tempo and key:
-        bot.send_message(user_id, f"✅ Analyse voltooid:\n🔑 Key: {key}\n🎶 BPM: {int(tempo)}")
-    else:
-        bot.send_message(user_id, "⚠️ Er ging iets mis bij de analyse.")
-    
+    url = message.text
     try:
-        os.remove("audio.mp3")
-    except Exception:
-        pass
+        bot.send_message(message.chat.id, "🎧 Downloaden en analyseren... Even geduld.")
+        file_path = download_audio_from_youtube(url)
+        bpm, key = analyse_audio(file_path)
+        bot.send_message(message.chat.id, f"✅ Analyse voltooid:\n\n🔑 Key: {key}\n🎵 BPM: {round(bpm)}")
+        os.remove(file_path)
+    except Exception as e:
+        logging.error(f"Fout bij analyse: {e}")
+        bot.send_message(message.chat.id, "❌ Er ging iets mis bij het downloaden of analyseren.")
 
-@app.route('/' + API_TOKEN, methods=['POST'])
+# Flask route voor webhook
+@app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
-    json_string = request.get_data().decode('utf-8')
-    logging.debug(f"[Webhook] JSON ontvangen: {json_string}")
-    update = telebot.types.Update.de_json(json_string)
-    bot.process_new_updates([update])
-    logging.info("[Webhook] Update verwerkt")
-    return '', 200
+    update = request.get_json()
+    logging.debug(f"[Webhook] JSON ontvangen: {update}")
+    if update:
+        bot.process_new_updates([telebot.types.Update.de_json(update)])
+    return 'OK', 200
 
-@app.route('/')
+# Root endpoint
+@app.route('/', methods=['GET'])
 def index():
-    return '✅ Telegram Bot draait!', 200
+    return 'Bot draait!', 200
 
+# Run alleen in development (Railway gebruikt gunicorn)
 if __name__ == '__main__':
-    bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
-    app.run(host='0.0.0.0', port=8080)
+    app.run(debug=True)
