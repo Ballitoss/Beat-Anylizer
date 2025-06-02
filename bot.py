@@ -1,87 +1,71 @@
+import telebot
 import os
 import logging
 from flask import Flask, request
-import telebot
-from yt_dlp import YoutubeDL
+from youtube_download import download_youtube_audio
 import librosa
-import soundfile as sf
-import uuid
 
-# Logging inschakelen
+API_TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
+WEBHOOK_URL = 'https://web-production-cfc73.up.railway.app/' + API_TOKEN
+
+bot = telebot.TeleBot(API_TOKEN)
+app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
-
-# Audio-analysefunctie
-def analyseer_audio(pad):
+def analyze_audio(file_path):
     try:
-        y, sr = librosa.load(pad)
+        y, sr = librosa.load(file_path)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        key = librosa.key.key_to_note(librosa.key.estimate_key(y, sr))
-        return f"BPM: {round(tempo)}\nKey: {key}"
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+        avg_chroma = chroma.mean(axis=1)
+        note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        key_index = avg_chroma.argmax()
+        key = note_names[key_index]
+        return tempo, key
     except Exception as e:
         logging.error(f"Fout bij analyse: {e}")
-        return "Fout bij analyseren van audio."
+        return None, None
 
-# YouTube-download en analyse
-def verwerk_youtube_link(link):
-    try:
-        bestandnaam = f"audio_{uuid.uuid4()}.mp3"
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": bestandnaam,
-            "quiet": True,
-            "noplaylist": True,
-            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.85 Safari/537.36",
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }],
-        }
-
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
-
-        analyse_resultaat = analyseer_audio(bestandnaam)
-        return bestandnaam, analyse_resultaat
-    except Exception as e:
-        logging.error(f"Fout bij analyse: {e}")
-        return None, "Fout bij het downloaden of analyseren van de video."
-
-# Webhook handler
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = request.get_json()
-    logging.debug(f"[Webhook] JSON ontvangen: {update}")
-    if update:
-        bot.process_new_updates([telebot.types.Update.de_json(update)])
-    return "ok", 200
-
-# Start commando
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.send_message(message.chat.id, "🎶 Welkom bij de Beat Analyzer Bot!\nStuur een YouTube-link en ik geef je BPM + toonhoogte.")
+    bot.reply_to(message, "🎧 Stuur me een YouTube-link van een beat, dan analyseer ik de BPM en Key.")
 
-# Link-handler
-@bot.message_handler(func=lambda msg: msg.text and "youtube.com" in msg.text or "youtu.be" in msg.text)
+@bot.message_handler(func=lambda msg: msg.text and 'youtu' in msg.text)
 def handle_youtube_link(message):
-    bestand, analyse = verwerk_youtube_link(message.text)
-    if bestand:
-        with open(bestand, "rb") as audio:
-            bot.send_audio(message.chat.id, audio)
-        bot.send_message(message.chat.id, analyse)
-        os.remove(bestand)
+    url = message.text.strip()
+    user_id = message.chat.id
+    logging.debug(f"Ontvangen YouTube-link: {url}")
+
+    file_path = download_youtube_audio(url, output_path="audio.mp3")
+    if file_path is None:
+        bot.send_message(user_id, "❌ Fout bij het downloaden van de audio.")
+        return
+
+    tempo, key = analyze_audio(file_path)
+    if tempo and key:
+        bot.send_message(user_id, f"✅ Analyse voltooid:\n🔑 Key: {key}\n🎶 BPM: {int(tempo)}")
     else:
-        bot.send_message(message.chat.id, analyse)
+        bot.send_message(user_id, "⚠️ Er ging iets mis bij de analyse.")
+    
+    try:
+        os.remove("audio.mp3")
+    except Exception:
+        pass
 
-# Root
-@app.route("/")
+@app.route('/' + API_TOKEN, methods=['POST'])
+def webhook():
+    json_string = request.get_data().decode('utf-8')
+    logging.debug(f"[Webhook] JSON ontvangen: {json_string}")
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    logging.info("[Webhook] Update verwerkt")
+    return '', 200
+
+@app.route('/')
 def index():
-    return "🎵 Beat Analyzer draait."
+    return '✅ Telegram Bot draait!', 200
 
-# Exporteer app voor Gunicorn
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+if __name__ == '__main__':
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL)
+    app.run(host='0.0.0.0', port=8080)
