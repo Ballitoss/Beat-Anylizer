@@ -1,8 +1,11 @@
 [build]
-packages = ["ffmpeg"]
+nixpacksPlan = "default"
 
-[env]
-PYTHONUNBUFFERED = "1"
-
-[start]
-cmd = "gunicorn bot:app"
+[build.default]
+builder = "NIXPACKS"
+buildCommand = """
+  apt update && apt install -y ffmpeg
+  pip install --upgrade pip
+  pip install -r requirements.txt
+"""
+startCommand = "gunicorn bot:app"
