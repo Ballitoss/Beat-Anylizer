@@ -1,3 +1,4 @@
+python-telegram-bot==13.15
 Flask==2.3.2
 gunicorn==23.0.0
 yt_dlp==2024.5.27
@@ -5,5 +6,4 @@ librosa==0.10.1
 numpy
 soundfile
 scipy
-pyTelegramBotAPI==4.14.1
-pydub==0.25.1
+pydub
