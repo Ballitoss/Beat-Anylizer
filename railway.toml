@@ -1,18 +1,12 @@
 [build]
 nixpacksPlan = { 
-  phases = {
-    setup = {
-      nixPkgs = ["ffmpeg"]
-    },
-    install = {
-      cmds = [
-        "python -m venv /opt/venv",
-        ". /opt/venv/bin/activate",
-        "pip install --upgrade pip",
-        "pip install -r requirements.txt"
-      ]
-    }
-  }
+  setup = ["ffmpeg"], 
+  install = [
+    "python3 -m venv /opt/venv",
+    ". /opt/venv/bin/activate",
+    "pip install --upgrade pip",
+    "pip install -r requirements.txt"
+  ] 
 }
 
 [start]
