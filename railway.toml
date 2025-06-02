@@ -1,13 +1,8 @@
 [build]
 nixpacksPlan = { 
-  setup = ["ffmpeg"], 
-  install = [
-    "python3 -m venv /opt/venv",
-    ". /opt/venv/bin/activate",
-    "pip install --upgrade pip",
-    "pip install -r requirements.txt"
-  ] 
+  phases = {
+    setup = { nixPkgs = ["ffmpeg", "python312", "python312Packages.pip"] },
+    install = "pip install -r requirements.txt",
+    start = "gunicorn bot:app"
+  }
 }
-
-[start]
-cmd = "gunicorn bot:app"
