@@ -3,61 +3,72 @@ import logging
 import tempfile
 import telebot
 import librosa
+import numpy as np
+import soundfile as sf
 from flask import Flask, request
 from yt_dlp import YoutubeDL
 
-# Zet logging aan
+# Logging activeren
 logging.basicConfig(level=logging.DEBUG)
 
-# Bot setup
+# Telegram token en Flask
 TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# YouTube audio download met cookies.txt ondersteuning
+# Audio downloaden met fallback headers & cookies
 def download_audio_from_youtube(url):
-    temp_dir = tempfile.gettempdir()
-    output_path = os.path.join(temp_dir, 'audio.%(ext)s')
+    output_path = os.path.join(tempfile.gettempdir(), 'audio.%(ext)s')
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': output_path,
+        'quiet': True,
+        'noplaylist': True,
+        'cookiefile': 'cookies.txt',
+        'user_agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        ),
+        'http_headers': {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ),
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'wav',
             'preferredquality': '192',
-        }],
-        'cookiefile': 'cookies.txt',
-        'quiet': True,
-        'no_warnings': True,
+        }]
     }
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            final_path = os.path.join(temp_dir, 'audio.wav')
-            if os.path.exists(final_path):
-                return final_path
-            else:
-                raise Exception("Bestand is niet aangemaakt.")
+            logging.debug(f"[DOWNLOAD INFO] {info}")
+            return os.path.join(tempfile.gettempdir(), 'audio.wav')
     except Exception as e:
         logging.error(f"[DOWNLOAD FOUT] {e}")
         raise
 
-# Analyse van BPM en key
+# Analyse van audio (BPM & key)
 def analyse_audio(file_path):
     y, sr = librosa.load(file_path)
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     chroma = librosa.feature.chroma_cens(y=y, sr=sr)
-    key_index = chroma.mean(axis=1).argmax()
+    chroma_mean = chroma.mean(axis=1)
+    key_index = chroma_mean.argmax()
     key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][key_index]
     return tempo, key
 
-# Telegram: start command
+# Telegram /start
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     bot.send_message(message.chat.id, "🎶 Stuur een YouTube-link en ik analyseer het voor je!")
 
-# Telegram: YouTube link handler
+# YouTube-link afhandelen
 @bot.message_handler(func=lambda message: 'youtu' in message.text)
 def handle_youtube_link(message):
     url = message.text.strip()
@@ -65,14 +76,14 @@ def handle_youtube_link(message):
         bot.send_message(message.chat.id, "🎧 Downloaden en analyseren... een moment.")
         file_path = download_audio_from_youtube(url)
         bpm, key = analyse_audio(file_path)
-        bot.send_message(message.chat.id, f"✅ Analyse:\n\n🔑 Key: {key}\n🎵 BPM: {round(bpm)}")
+        bot.send_message(message.chat.id, f"✅ Analyse voltooid:\n\n🔑 Key: {key}\n🎵 BPM: {round(bpm)}")
         os.remove(file_path)
     except Exception as e:
         logging.error(f"Fout bij analyse: {e}")
-        bot.send_message(message.chat.id, "❌ Fout bij het downloaden of analyseren van de audio.")
+        bot.send_message(message.chat.id, "❌ Er ging iets mis bij het downloaden of analyseren.")
 
-# Webhook endpoint
-@app.route(f'/{TOKEN}', methods=['POST'])
+# Webhook route
+@app.route(f"/{TOKEN}", methods=['POST'])
 def webhook():
     update = request.get_json()
     logging.debug(f"[Webhook] JSON ontvangen: {update}")
@@ -80,11 +91,11 @@ def webhook():
         bot.process_new_updates([telebot.types.Update.de_json(update)])
     return 'OK', 200
 
-# Index voor Railway
+# Testpagina
 @app.route('/', methods=['GET'])
 def index():
     return 'Bot draait!', 200
 
-# Alleen lokaal runnen, niet in productie
+# Alleen lokaal starten (niet op Railway)
 if __name__ == '__main__':
     app.run(debug=True)
