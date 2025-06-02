@@ -1,98 +1,98 @@
 import os
 import logging
 import tempfile
-import telebot
-import librosa
-import numpy as np
-import soundfile as sf
 from flask import Flask, request
 from yt_dlp import YoutubeDL
+import telebot
+import librosa
+import soundfile as sf
 
-# Logging activeren
+# === Configuratie ===
+BOT_TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
+COOKIE_FILE = 'cookies.txt'
+WEBHOOK_URL = 'https://web-production-cfc73.up.railway.app/'
+
+# === Init ===
+bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-# Telegram token en Flask
-TOKEN = '7739002753:AAFgh-UlgRkYCd20CUrnUbhJ36ApQQ6ZL7o'
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
-
-# YouTube audio downloaden
-def download_youtube_audio(url, output_path):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': output_path,
-        'quiet': True,
-        'noplaylist': True,
-        'cookiefile': 'cookies.txt',
-        'user_agent': (
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        ),
-        'http_headers': {
-            'User-Agent': (
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-            ),
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-    }
+# === Audio Analyse ===
+def analyse_audio(file_path):
     try:
+        y, sr = librosa.load(file_path)
+        bpm = librosa.beat.tempo(y=y, sr=sr)[0]
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+        key_index = chroma.mean(axis=1).argmax()
+        key_name = ['C', 'C#', 'D', 'D#', 'E', 'F',
+                    'F#', 'G', 'G#', 'A', 'A#', 'B'][key_index % 12]
+        return round(bpm), key_name
+    except Exception as e:
+        logging.error(f"[ANALYSE FOUT] {e}")
+        return None, None
+
+# === Download Audio ===
+def download_youtube_audio(url):
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp:
+            output_path = temp.name
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': output_path,
+            'quiet': True,
+            'noplaylist': True,
+            'cookiefile': COOKIE_FILE,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        }
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        return True
+        return output_path
     except Exception as e:
         logging.error(f"[DOWNLOAD FOUT] {e}")
-        return False
+        return None
 
-# BPM en toonhoogte analyseren
-def analyse_audio(file_path):
-    y, sr = librosa.load(file_path)
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    chroma = librosa.feature.chroma_cens(y=y, sr=sr)
-    chroma_mean = chroma.mean(axis=1)
-    key_index = chroma_mean.argmax()
-    key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][key_index]
-    return tempo, key
-
-# Telegram /start
+# === Handlers ===
 @bot.message_handler(commands=['start'])
-def handle_start(message):
+def start_handler(message):
     bot.send_message(message.chat.id, "🎶 Stuur een YouTube-link en ik analyseer het voor je!")
 
-# YouTube-link verwerken
-@bot.message_handler(func=lambda message: 'youtu' in message.text)
-def handle_youtube_link(message):
+@bot.message_handler(func=lambda m: 'youtube.com' in m.text or 'youtu.be' in m.text)
+def youtube_handler(message):
     url = message.text.strip()
-    chat_id = message.chat.id
-    bot.send_message(chat_id, "🎷 Downloaden en analyseren... een moment.")
+    bot.send_message(message.chat.id, "🎷 Downloaden en analyseren... een moment.")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        audio_path = os.path.join(tmpdir, "audio.mp3")
+    mp3_path = download_youtube_audio(url)
+    if not mp3_path:
+        bot.send_message(message.chat.id, "⚠️ Kan audio niet downloaden. Check cookies.txt of probeer een andere video.")
+        return
 
-        if not download_youtube_audio(url, audio_path):
-            bot.send_message(chat_id, "❌ Downloaden mislukt. Probeer een andere video of check je cookies.txt.")
-            return
+    bpm, key = analyse_audio(mp3_path)
+    if bpm and key:
+        bot.send_message(message.chat.id, f"🔊 BPM: {bpm}\n🎵 Key: {key}")
+    else:
+        bot.send_message(message.chat.id, "⚠️ Kon de audio niet analyseren.")
 
-        try:
-            bpm, key = analyse_audio(audio_path)
-            bot.send_message(chat_id, f"✅ Analyse voltooid:\n\n🔑 Key: {key}\n🎵 BPM: {round(bpm)}")
-        except Exception as e:
-            logging.error(f"Fout bij analyse: {e}")
-            bot.send_message(chat_id, "❌ Er ging iets mis bij het analyseren van de audio.")
+    with open(mp3_path, 'rb') as audio:
+        bot.send_audio(message.chat.id, audio)
 
-# Webhook voor Telegram
-@app.route(f'/{TOKEN}', methods=['POST'])
+    os.remove(mp3_path)
+
+# === Webhook Endpoint ===
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = request.get_json()
-    logging.debug(f"[Webhook] JSON ontvangen: {update}")
-    if update:
-        bot.process_new_updates([telebot.types.Update.de_json(update)])
-    return 'OK', 200
+    logging.debug("[Webhook] JSON ontvangen: %s", update)
+    bot.process_new_updates([telebot.types.Update.de_json(update)])
+    return "", 200
 
-@app.route('/', methods=['GET'])
-def index():
-    return 'Bot draait!', 200
+# === Set Webhook ===
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL + BOT_TOKEN)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
